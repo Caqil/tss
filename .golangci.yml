@@ -1,0 +1,156 @@
+# golangci-lint configuration for MPC-TSS
+# See https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
+
+linters:
+  enable:
+    # Security linters
+    - gosec        # Security problems
+    - gocritic     # Opinionated checks
+
+    # Bug detection
+    - errcheck     # Unchecked errors
+    - govet        # Reports suspicious constructs
+    - staticcheck  # Advanced static analysis
+    - typecheck    # Type-check code
+    - ineffassign  # Detects ineffectual assignments
+    - unconvert    # Unnecessary type conversions
+
+    # Style and maintainability
+    - gofmt        # Format code
+    - goimports    # Auto-fix imports
+    - misspell     # Spell checking
+    - revive       # Drop-in replacement for golint
+    - stylecheck   # Stylecheck is a replacement for golint
+
+    # Complexity
+    - gocyclo      # Cyclomatic complexity
+    - gocognit     # Cognitive complexity
+    - nestif       # Deeply nested if statements
+
+    # Performance
+    - prealloc     # Slice preallocation
+    - bodyclose    # HTTP body close check
+
+    # Code quality
+    - dupl         # Code duplication
+    - goconst      # Repeated strings that could be constants
+    - godot        # Check comments end in period
+    - errorlint    # Error handling best practices
+    - nilerr       # Return nil error
+
+  disable:
+    - funlen       # Too strict for complex crypto code
+    - lll          # Line length varies in crypto
+    - wsl          # Too opinionated about whitespace
+
+linters-settings:
+  gosec:
+    # Security-critical settings
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # We use errcheck instead
+    config:
+      G101: # Look for hardcoded credentials
+        pattern: "(?i)(api_key|apikey|secret|token|password|passwd|pwd|private_key)"
+      G401: # Weak crypto - we use this intentionally in tests
+        ignore_files:
+          - "*_test.go"
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (*os.File).Close
+      - (io.Closer).Close
+
+  govet:
+    check-shadowing: true
+    settings:
+      shadow:
+        strict: true
+
+  gocyclo:
+    min-complexity: 15
+
+  gocognit:
+    min-complexity: 20
+
+  dupl:
+    threshold: 100
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    ignore-tests: true
+
+  misspell:
+    locale: US
+    ignore-words:
+      - cancelled
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - unnecessaryDefer
+      - whyNoLint
+
+  stylecheck:
+    checks: ["all", "-ST1003"]  # Allow underscores in names for crypto
+
+  revive:
+    severity: warning
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+        arguments:
+          - "checkPrivateReceivers"
+          - "sayRepetitiveInsteadOfStutters"
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - gosec
+        - dupl
+        - goconst
+
+    # Exclude known issues in generated code
+    - path: ".*\\.pb\\.go$"
+      linters:
+        - all
+
+    # Allow complex crypto functions
+    - path: pkg/crypto/
+      linters:
+        - gocyclo
+        - gocognit
+
+    # Allow long functions in protocol implementation
+    - path: pkg/(keygen|signing)/
+      linters:
+        - gocyclo
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  fix: false
